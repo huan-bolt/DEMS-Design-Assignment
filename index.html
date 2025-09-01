@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DEMS - Interactive System Design Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chosen Palette: Calm Harmony (Stone, Slate, Teal, Sky) -->
+    <!-- Application Structure Plan: The application is designed as an interactive dashboard to deconstruct the complex DEMS architecture. The primary view is an "Architecture Explorer" featuring a clickable system diagram. This is the centerpiece, allowing users to visually grasp component relationships. Clicking a component reveals its details, promoting active learning over passive reading. This is supplemented by dedicated sections for "Core Workflows" (Upload, Search) and "Design Pillars" (Security, Reliability, etc.). This non-linear, thematic structure was chosen because it allows an audience (like an interview panel) to explore the system based on their interest, either high-level (the diagram), process-oriented (the workflows), or principle-based (the pillars), which is far more effective for understanding a complex design than a linear document. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Overall System Architecture -> Goal: Organize/Show Relationships -> Viz: Interactive Diagram (HTML/CSS Grid) -> Interaction: Click on a component to display its detailed description in a side panel. -> Justification: Visually communicates the system's structure and component interconnectivity, which is the most critical aspect of the design. -> Method: Vanilla JS with Tailwind CSS.
+        - Report Info: Upload/Search Process -> Goal: Explain a process over time -> Viz: Step-by-step animated flow diagrams -> Interaction: Buttons to toggle flows, highlighting active steps. -> Justification: Simplifies complex, multi-step processes into an easily digestible visual sequence. -> Method: HTML/CSS with JS for state changes.
+        - Report Info: Design/Support Principles (Security, HA, Durability) -> Goal: Inform/Organize -> Viz: Grid of interactive cards -> Interaction: Click a card to reveal detailed information in a modal/expanded view. -> Justification: Presents dense, text-based principles in a clean, organized manner, allowing users to drill down into specifics without initial clutter. -> Method: HTML/CSS with JS for toggling visibility.
+        - CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. 
+    -->
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .nav-item.active {
+            background-color: #0d9488; /* teal-600 */
+            color: white;
+        }
+        .diagram-node {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .diagram-node.active, .diagram-node:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 0 3px #38bdf8; /* sky-400 */
+            background-color: #f0fdfa; /* teal-50 */
+        }
+        .pillar-card {
+            transition: all 0.2s ease-in-out;
+        }
+        .pillar-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+        .flow-step {
+            opacity: 0.5;
+            transition: all 0.3s ease-in-out;
+        }
+        .flow-step.active {
+            opacity: 1;
+            transform: scale(1.03);
+        }
+        .line {
+            background-color: #94a3b8; /* slate-400 */
+            position: absolute;
+            z-index: -1;
+        }
+        .line-arrow::after {
+            content: '►';
+            position: absolute;
+            color: #94a3b8; /* slate-400 */
+            font-size: 16px;
+        }
+    </style>
+</head>
+<body class="bg-stone-50 text-slate-800">
+
+    <div id="app" class="flex flex-col md:flex-row min-h-screen">
+        <!-- Sidebar Navigation -->
+        <nav class="bg-slate-800 text-white w-full md:w-64 flex-shrink-0">
+            <div class="p-6">
+                <h1 class="text-2xl font-bold">DEMS Design</h1>
+                <p class="text-sm text-slate-400">Interactive Explorer</p>
+            </div>
+            <ul id="navigation" class="mt-4">
+                <li><a href="#explorer" class="nav-item block p-4 text-lg hover:bg-slate-700 active">Architecture Explorer</a></li>
+                <li><a href="#workflows" class="nav-item block p-4 text-lg hover:bg-slate-700">Core Workflows</a></li>
+                <li><a href="#pillars" class="nav-item block p-4 text-lg hover:bg-slate-700">Design Pillars</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="flex-1 p-4 sm:p-6 md:p-10">
+            <!-- Architecture Explorer View -->
+            <div id="view-explorer" class="view-content">
+                <h2 class="text-4xl font-bold mb-2">Architecture Explorer</h2>
+                <p class="text-slate-600 mb-8">This is an interactive diagram of the Digital Evidence Management System. Click on any component to learn more about its role and function within the architecture. The system is designed around a microservices approach for scalability and resilience.</p>
+                <div class="flex flex-col lg:flex-row gap-8">
+                    <!-- Interactive Diagram -->
+                    <div id="diagram-container" class="flex-grow w-full lg:w-2/3 relative grid grid-cols-3 grid-rows-4 gap-x-8 gap-y-12 items-center">
+                        <!-- Lines connecting nodes -->
+                        <div class="line" style="width: 2px; height: 75%; top: 25%; left: 50%;"></div>
+                        <div class="line line-arrow" style="top: 23%; left: 49%; transform: rotate(90deg);"></div>
+                        <div class="line" style="width: 66%; height: 2px; top: 37.5%; left: 17%;"></div>
+                        <div class="line line-arrow" style="left: 16%; top: 36%; transform: rotate(180deg);"></div>
+                        <div class="line line-arrow" style="left: 82%; top: 36%;"></div>
+
+                        <div class="diagram-node col-start-2 p-4 text-center bg-white border-2 border-slate-300 rounded-lg shadow-md" data-component="apiGateway">API Gateway</div>
+                        <div class="diagram-node col-start-1 p-4 text-center bg-white border-2 border-slate-300 rounded-lg shadow-md" data-component="ingestion">Ingestion & Upload</div>
+                        <div class="diagram-node col-start-3 p-4 text-center bg-white border-2 border-slate-300 rounded-lg shadow-md" data-component="userServices">Auth & User Services</div>
+                        <div class="diagram-node col-start-2 row-start-2 p-4 text-center bg-white border-2 border-slate-300 rounded-lg shadow-md" data-component="mediaProcessing">Media Processing Pipeline</div>
+                        <div class="diagram-node col-start-1 row-start-3 p-4 text-center bg-white border-2 border-slate-300 rounded-lg shadow-md" data-component="storage">Storage Service</div>
+                        <div class="diagram-node col-start-3 row-start-3 p-4 text-center bg-white border-2 border-slate-300 rounded-lg shadow-md" data-component="metadata">Metadata & Case Mgmt</div>
+                        <div class="diagram-node col-start-1 row-start-4 p-4 text-center bg-white border-2 border-slate-300 rounded-lg shadow-md" data-component="search">Search & Indexing</div>
+                        <div class="diagram-node col-start-3 row-start-4 p-4 text-center bg-white border-2 border-red-300 rounded-lg shadow-md" data-component="audit">Audit & Immutability</div>
+                    </div>
+                    <!-- Details Panel -->
+                    <div id="details-panel" class="w-full lg:w-1/3 bg-white p-6 rounded-lg shadow-lg border">
+                         <h3 id="details-title" class="text-2xl font-bold text-teal-700 mb-4">Select a Component</h3>
+                         <p id="details-description" class="text-slate-700">Click on any block in the diagram to see its detailed description here. This will explain the component's purpose and how it fits into the overall system design.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Workflows View -->
+            <div id="view-workflows" class="view-content hidden">
+                 <h2 class="text-4xl font-bold mb-2">Core Workflows</h2>
+                 <p class="text-slate-600 mb-8">Understand how data moves through the system during key operations. These flows illustrate the journey of digital evidence from upload to retrieval, highlighting the interaction between different microservices.</p>
+                 <div class="flex gap-4 mb-8">
+                    <button id="show-upload-flow" class="px-4 py-2 bg-teal-600 text-white rounded-lg shadow hover:bg-teal-700">Show Upload Flow</button>
+                    <button id="show-search-flow" class="px-4 py-2 bg-sky-600 text-white rounded-lg shadow hover:bg-sky-700">Show Search Flow</button>
+                 </div>
+                 <!-- Upload Flow -->
+                 <div id="upload-flow-container" class="space-y-4 hidden">
+                    <h3 class="text-2xl font-bold">Evidence Upload & Ingestion</h3>
+                    <div id="upload-step-1" class="flow-step p-4 border-l-4 border-teal-500 bg-white rounded-r-lg shadow"><strong>1. Upload Request:</strong> Field device requests a secure, signed URL from the API Gateway to begin upload.</div>
+                    <div id="upload-step-2" class="flow-step p-4 border-l-4 border-teal-500 bg-white rounded-r-lg shadow"><strong>2. Direct Upload:</strong> Device uploads video directly to Object Storage using the signed URL, bypassing backend services for efficiency.</div>
+                    <div id="upload-step-3" class="flow-step p-4 border-l-4 border-teal-500 bg-white rounded-r-lg shadow"><strong>3. Trigger Processing:</strong> On completion, a trigger fires a message to the Message Queue, signaling a new file is ready.</div>
+                    <div id="upload-step-4" class="flow-step p-4 border-l-4 border-teal-500 bg-white rounded-r-lg shadow"><strong>4. Asynchronous Processing:</strong> The Media Processing Pipeline consumes the message and begins transcoding, analysis, and metadata extraction.</div>
+                    <div id="upload-step-5" class="flow-step p-4 border-l-4 border-teal-500 bg-white rounded-r-lg shadow"><strong>5. Store & Index:</strong> Processed media is sent to tiered Storage, metadata is stored, and key info is sent to the Search Service for indexing. All actions are logged.</div>
+                 </div>
+                  <!-- Search Flow -->
+                 <div id="search-flow-container" class="space-y-4 hidden">
+                    <h3 class="text-2xl font-bold">Evidence Search & Retrieval</h3>
+                    <div id="search-step-1" class="flow-step p-4 border-l-4 border-sky-500 bg-white rounded-r-lg shadow"><strong>1. User Query:</strong> User submits a search query via the Web/Mobile UI to the API Gateway.</div>
+                    <div id="search-step-2" class="flow-step p-4 border-l-4 border-sky-500 bg-white rounded-r-lg shadow"><strong>2. Auth & Validation:</strong> The API Gateway and Auth Service validate the user's identity and permissions for the query.</div>
+                    <div id="search-step-3" class="flow-step p-4 border-l-4 border-sky-500 bg-white rounded-r-lg shadow"><strong>3. Execute Search:</strong> The request is forwarded to the Search & Indexing Service, which finds matching evidence from its index.</div>
+                    <div id="search-step-4" class="flow-step p-4 border-l-4 border-sky-500 bg-white rounded-r-lg shadow"><strong>4. Retrieve & Stream:</strong> Search results provide references to the media. When a user plays a video, it's streamed securely from the Storage Service, often via a CDN for performance.</div>
+                    <div id="search-step-5" class="flow-step p-4 border-l-4 border-sky-500 bg-white rounded-r-lg shadow"><strong>5. Audit:</strong> Every search and access attempt is permanently recorded in the Audit & Immutability Service.</div>
+                 </div>
+            </div>
+
+            <!-- Design Pillars View -->
+            <div id="view-pillars" class="view-content hidden">
+                <h2 class="text-4xl font-bold mb-2">Design Pillars & Requirements</h2>
+                <p class="text-slate-600 mb-8">The entire system is built upon a foundation of core principles ensuring it meets the stringent demands of law enforcement. Explore the key support requirements and design philosophies below.</p>
+                <div id="pillars-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- Pillar cards will be injected here by JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for Pillar Details -->
+    <div id="pillar-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl max-w-2xl w-full">
+            <div class="p-6 border-b">
+                <h3 id="modal-title" class="text-2xl font-bold"></h3>
+            </div>
+            <div id="modal-content" class="p-6 max-h-[60vh] overflow-y-auto">
+            </div>
+            <div class="p-4 bg-slate-50 border-t flex justify-end">
+                <button id="modal-close" class="px-4 py-2 bg-slate-600 text-white rounded-lg shadow hover:bg-slate-700">Close</button>
+            </div>
+        </div>
+    </div>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const appData = {
+        components: {
+            ingestion: {
+                title: 'Ingestion & Upload Service',
+                description: 'Handles the secure and reliable upload of evidence from field devices. It uses a signed URL pattern for direct-to-storage uploads, which offloads heavy data transfer from core services. Multipart uploads ensure resilience against network interruptions.'
+            },
+            apiGateway: {
+                title: 'API Gateway',
+                description: 'Provides a single, unified entry point for all client applications (field devices, web UI). It is responsible for request routing, rate limiting, and initial authentication, acting as a gatekeeper for the backend microservices.'
+            },
+            userServices: {
+                title: 'Auth & User Services',
+                description: 'Manages user identity, authentication, and authorization. It enforces Role-Based and Attribute-Based Access Control (RBAC/ABAC) to ensure users can only access data they are permitted to see.'
+            },
+            mediaProcessing: {
+                title: 'Media Processing Pipeline',
+                description: 'An asynchronous, message-driven service that transcodes, analyzes, and prepares media files. It extracts critical metadata, runs optional AI analysis (e.g., facial recognition), and prepares the evidence for long-term storage and fast retrieval.'
+            },
+            storage: {
+                title: 'Storage Service',
+                description: 'Manages the long-term, durable storage of raw and processed evidence. It employs a tiered storage strategy, moving less frequently accessed data to cheaper, colder storage tiers to optimize costs while maintaining high durability.'
+            },
+            metadata: {
+                title: 'Metadata & Case Management',
+                description: 'Stores and manages all non-media data, including case information, evidence tags, officer notes, and the chain of custody. This structured data is crucial for organizing and searching for evidence.'
+            },
+            search: {
+                title: 'Search & Indexing Service',
+                description: 'Creates and maintains a searchable index of all evidence metadata. It uses a powerful search engine like Elasticsearch to provide near real-time, complex querying capabilities, including text, geo, and time-based searches.'
+            },
+            audit: {
+                title: 'Audit & Immutability Service',
+                description: 'The cornerstone of the system’s integrity. It ensures every action (uploads, views, searches, deletions) is permanently recorded in a tamper-proof, append-only ledger. This provides a defensible chain of custody.'
+            }
+        },
+        pillars: [
+            { id: 'availability', title: 'High Availability & Scale', content: `
+                <p>The system is designed to be highly available and to scale to petabytes of data and hundreds of thousands of users.</p>
+                <ul class="list-disc list-inside mt-4 space-y-2">
+                    <li><strong>Redundancy and Failover:</strong> All services are deployed in a multi-region configuration. Critical components like databases and message queues are replicated across availability zones to prevent single points of failure.</li>
+                    <li><strong>Stateless Services:</strong> Most microservices are stateless, allowing for easy horizontal scaling to handle load increases.</li>
+                    <li><strong>Asynchronous Processing:</strong> The use of message queues decouples services, preventing bottlenecks and ensuring the system remains responsive even under heavy ingestion load.</li>
+                </ul>`
+            },
+            { id: 'performance', title: 'Performance', content: `
+                <p>Performance is optimized through several key strategies to ensure a responsive user experience, even with massive data volumes.</p>
+                <ul class="list-disc list-inside mt-4 space-y-2">
+                    <li><strong>Data Tiering:</strong> Evidence is stored in a tiered approach. Frequently accessed data is in "hot" storage (e.g., S3 Standard), while older data moves to "cold" storage (e.g., S3 Glacier Deep Archive) to balance cost and retrieval time.</li>
+                    <li><strong>Content Delivery Network (CDN):</strong> A CDN is used to cache and deliver video streams to users globally, significantly reducing latency and load on the backend storage services.</li>
+                    <li><strong>Efficient Indexing:</strong> The search service uses a highly optimized index to return query results in milliseconds, even across billions of records.</li>
+                </ul>`
+            },
+            { id: 'monitoring', title: 'System Health & Monitoring', content: `
+                <p>We actively manage system health by collecting three major categories of data: Metrics, Logs, and Traces.</p>
+                <ul class="list-disc list-inside mt-4 space-y-2">
+                    <li><strong>Tooling:</strong> A combination of tools like Prometheus for metrics, an ELK Stack for logging, and Jaeger for distributed tracing provides deep visibility into system behavior.</li>
+                    <li><strong>Alerting Hygiene:</strong> Alerting is based on actionable Service Level Objectives (SLOs). We focus on the "golden signals" (latency, traffic, errors, saturation) to prevent alert fatigue and ensure alerts are meaningful.</li>
+                    <li><strong>Data Management:</strong> Telemetry data is managed across regions and aggregated in a central location for a global view of system health.</li>
+                </ul>`
+            },
+            { id: 'iac', title: 'Infrastructure as Code', content: `
+                <p>The entire environment is managed using an Infrastructure as Code (IaC) approach with tools like Terraform or CloudFormation.</p>
+                <ul class="list-disc list-inside mt-4 space-y-2">
+                    <li><strong>Version Controlled:</strong> All infrastructure changes are version-controlled in Git, providing a full history and audit trail.</li>
+                    <li><strong>Repeatable & Automated:</strong> IaC ensures that environments can be created and updated in a repeatable, automated fashion, reducing manual errors.</li>
+                    <li><strong>Safe Rollouts:</strong> Changes are rolled out safely across multiple regions using automated CI/CD pipelines with stages for testing and validation.</li>
+                </ul>`
+            },
+            { id: 'security', title: 'Security', content: `
+                <p>We adopt a Zero Trust security model, aiming for compliance with standards like CJIS (Criminal Justice Information Services).</p>
+                <ul class="list-disc list-inside mt-4 space-y-2">
+                    <li><strong>Authentication:</strong> Modern protocols like OpenID Connect (OIDC) are used for secure authentication against a centralized identity provider.</li>
+                    <li><strong>Authorization:</strong> Fine-grained permissions are enforced using Role-Based (RBAC) and Attribute-Based (ABAC) Access Control.</li>
+                    <li><strong>Data Encryption:</strong> All data is encrypted both in transit (TLS 1.2+) and at rest using strong encryption standards (AES-256).</li>
+                </ul>`
+            },
+            { id: 'durability', title: 'Data Durability & Deletion', content: `
+                <p>The system is designed for a data durability of at least <strong>99.999999999% (11 nines)</strong>.</p>
+                <ul class="list-disc list-inside mt-4 space-y-2">
+                    <li><strong>Redundant Storage:</strong> This durability is achieved by using cloud object storage solutions that automatically replicate data across multiple geographically distinct data centers.</li>
+                    <li><strong>Safe Deletion:</strong> Deleting evidence is a multi-step, auditable process. A deletion request marks the data for removal based on a retention policy. The actual deletion is deferred and the entire workflow is recorded in the immutable audit ledger to maintain the chain of custody.</li>
+                </ul>`
+            }
+        ]
+    };
+
+    // Navigation Logic
+    const navItems = document.querySelectorAll('.nav-item');
+    const views = document.querySelectorAll('.view-content');
+    
+    function switchView(hash) {
+        navItems.forEach(item => {
+            item.classList.toggle('active', item.getAttribute('href') === hash);
+        });
+        views.forEach(view => {
+            view.classList.toggle('hidden', view.id !== `view-${hash.substring(1)}`);
+        });
+    }
+
+    document.getElementById('navigation').addEventListener('click', (e) => {
+        if (e.target.tagName === 'A') {
+            const hash = e.target.getAttribute('href');
+            switchView(hash);
+        }
+    });
+    
+    // Initial view based on hash or default
+    const currentHash = window.location.hash || '#explorer';
+    switchView(currentHash);
+
+    // Architecture Explorer Logic
+    const diagramNodes = document.querySelectorAll('.diagram-node');
+    const detailsTitle = document.getElementById('details-title');
+    const detailsDescription = document.getElementById('details-description');
+
+    diagramNodes.forEach(node => {
+        node.addEventListener('click', () => {
+            diagramNodes.forEach(n => n.classList.remove('active'));
+            node.classList.add('active');
+            
+            const componentKey = node.dataset.component;
+            const componentData = appData.components[componentKey];
+            
+            detailsTitle.textContent = componentData.title;
+            detailsDescription.textContent = componentData.description;
+        });
+    });
+
+    // Core Workflows Logic
+    const showUploadBtn = document.getElementById('show-upload-flow');
+    const showSearchBtn = document.getElementById('show-search-flow');
+    const uploadFlowContainer = document.getElementById('upload-flow-container');
+    const searchFlowContainer = document.getElementById('search-flow-container');
+
+    function animateFlow(container) {
+        container.classList.remove('hidden');
+        const steps = container.querySelectorAll('.flow-step');
+        steps.forEach(step => step.classList.remove('active'));
+        let i = 0;
+        const interval = setInterval(() => {
+            if (i < steps.length) {
+                steps[i].classList.add('active');
+                i++;
+            } else {
+                clearInterval(interval);
+            }
+        }, 500);
+    }
+
+    showUploadBtn.addEventListener('click', () => {
+        searchFlowContainer.classList.add('hidden');
+        animateFlow(uploadFlowContainer);
+    });
+
+    showSearchBtn.addEventListener('click', () => {
+        uploadFlowContainer.classList.add('hidden');
+        animateFlow(searchFlowContainer);
+    });
+
+    // Pillars Logic
+    const pillarsGrid = document.getElementById('pillars-grid');
+    const modal = document.getElementById('pillar-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const modalContent = document.getElementById('modal-content');
+    const modalClose = document.getElementById('modal-close');
+
+    appData.pillars.forEach(pillar => {
+        const card = document.createElement('div');
+        card.className = 'pillar-card bg-white p-6 rounded-lg shadow-md border cursor-pointer';
+        card.innerHTML = `<h3 class="text-xl font-bold text-slate-800">${pillar.title}</h3>`;
+        card.dataset.pillarId = pillar.id;
+        pillarsGrid.appendChild(card);
+    });
+
+    pillarsGrid.addEventListener('click', (e) => {
+        const card = e.target.closest('.pillar-card');
+        if (card) {
+            const pillarId = card.dataset.pillarId;
+            const pillarData = appData.pillars.find(p => p.id === pillarId);
+            modalTitle.textContent = pillarData.title;
+            modalContent.innerHTML = pillarData.content;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+    });
+
+    function closeModal() {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    modalClose.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            closeModal();
+        }
+    });
+
+});
+</script>
+</body>
+</html>
